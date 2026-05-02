@@ -46,18 +46,18 @@ YAML is broadly adopted nowadays for easy configurations but it is harder to sup
 First we need to choose what encoding we will use.
 
 <details>
-<summary>[encoding/json](https://pkg.go.dev/encoding/json@go1.26.2)</summary>
+<summary> encoding/json </summary>
 
-`encoding/json` is the stable standard library JSON package. It follows [RFC 7159](https://rfc-editor.org/rfc/rfc7159.html), is widely used, and prioritizes backwards compatibility.
+[encoding/json](https://pkg.go.dev/encoding/json@go1.26.2) is the stable standard library JSON package. It follows [RFC 7159](https://rfc-editor.org/rfc/rfc7159.html), is widely used, and prioritizes backwards compatibility.
 
 It preserves some legacy behaviors for compatibility, including edge cases that can be surprising, but it remains the conservative and practical choice for configuration loading.
 
 </details>
 
 <details>
-<summary> :x: [encoding/json/v2](https://pkg.go.dev/encoding/json/v2@go1.26.2)</summary>
+<summary> :x: encoding/json/v2 </summary>
 
-`encoding/json/v2` is the newer JSON API intended to address limitations and legacy behaviors in `encoding/json`. It follows [RFC 8259](https://rfc-editor.org/rfc/rfc8259.html) and offers a more modern and explicit design.
+[encoding/json/v2](https://pkg.go.dev/encoding/json/v2@go1.26.2) is the newer JSON API intended to address limitations and legacy behaviors in `encoding/json`. It follows [RFC 8259](https://rfc-editor.org/rfc/rfc8259.html) and offers a more modern and explicit design.
 
 For this project, however, it is not the right choice. The goal is not to perform an in-depth study of JSON semantics or to explore the newer API surface. We want the most stable, conventional, and low-friction option for static configuration parsing.
 
