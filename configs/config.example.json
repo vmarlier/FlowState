@@ -1,0 +1,32 @@
+{
+  "server": {
+    "listen_addr": ":8080",
+    "read_timeout_ms": 5000,
+    "write_timeout_ms": 10000,
+    "idle_timeout_ms": 60000
+  },
+  "routes": [
+    {
+      "host": "api.local",
+      "path_prefix": "/users",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "middlewares": [
+        "request_id",
+        "logging"
+      ],
+      "backends": [
+        {
+          "url": "http://127.0.0.1:9001",
+          "weight": 2
+        },
+        {
+          "url": "http://127.0.0.1:9002",
+          "weight": 1
+        }
+      ]
+    }
+  ]
+}
