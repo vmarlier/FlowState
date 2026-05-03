@@ -10,25 +10,21 @@ import (
 	"strings"
 )
 
-// TODO:
-// validate backend URL host
-// simplify/fix path prefix check implementation
-
 type Config struct {
 	Server Server  `json:"server"`
 	Routes []Route `json:"routes"`
 }
 
 type Server struct {
-	Listen_addr      string `json:"listen_addr"`
-	Read_timeout_ms  int    `json:"read_timeout_ms,omitempty"`  // default 5000
-	Write_timeout_ms int    `json:"write_timeout_ms,omitempty"` // defualt 10000
-	Idle_timeout_ms  int    `json:"idle_timeout_ms,omitempty"`  // default 60000
+	ListenAddr     string `json:"listen_addr"`
+	ReadTimeoutMs  int    `json:"read_timeout_ms,omitempty"`  // default 5000
+	WriteTimeoutMs int    `json:"write_timeout_ms,omitempty"` // defualt 10000
+	IdleTimeoutMs  int    `json:"idle_timeout_ms,omitempty"`  // default 60000
 }
 
 type Route struct {
 	Host        string    `json:"host"`
-	Path_prefix string    `json:"path_prefix,omitempty"` // default /
+	PathPrefix  string    `json:"path_prefix,omitempty"` // default /
 	Methods     []string  `json:"methods,omitempty"`     // default GET, POST
 	Middlewares []string  `json:"middlewares,omitempty"` // default none
 	Backends    []Backend `json:"backends"`
@@ -40,14 +36,14 @@ type Backend struct {
 }
 
 const (
-	server_read_timeout_ms  = 5000
-	server_write_timeout_ms = 10000
-	server_idle_timeout_ms  = 60000
-	route_path_prefix       = "/"
-	route_backend_weight    = 1
+	serverReadTimeoutMs  = 5000
+	serverWriteTimeoutMs = 10000
+	serverIdleTimeoutMs  = 60000
+	routePathPrefix      = "/"
+	routeBackendWeight   = 1
 )
 
-var route_methods = []string{http.MethodGet, http.MethodPost}
+var routeMethods = []string{http.MethodGet, http.MethodPost}
 
 func Load(path string) (*Config, error) {
 	file, err := os.Open(path)
@@ -62,6 +58,7 @@ func Load(path string) (*Config, error) {
 	}
 
 	config.defaultValues()
+	config.normalize()
 	err = config.validate()
 	if err != nil {
 		return nil, err
@@ -71,41 +68,48 @@ func Load(path string) (*Config, error) {
 }
 
 func (c *Config) defaultValues() {
-	if c.Server.Read_timeout_ms == 0 {
-		c.Server.Read_timeout_ms = server_read_timeout_ms
+	if c.Server.ReadTimeoutMs == 0 {
+		c.Server.ReadTimeoutMs = serverReadTimeoutMs
 	}
 
-	if c.Server.Write_timeout_ms == 0 {
-		c.Server.Write_timeout_ms = server_write_timeout_ms
+	if c.Server.WriteTimeoutMs == 0 {
+		c.Server.WriteTimeoutMs = serverWriteTimeoutMs
 	}
 
-	if c.Server.Idle_timeout_ms == 0 {
-		c.Server.Idle_timeout_ms = server_idle_timeout_ms
+	if c.Server.IdleTimeoutMs == 0 {
+		c.Server.IdleTimeoutMs = serverIdleTimeoutMs
 	}
 
 	for r, route := range c.Routes {
-		if route.Path_prefix == "" {
-			c.Routes[r].Path_prefix = route_path_prefix
+		if route.PathPrefix == "" {
+			c.Routes[r].PathPrefix = routePathPrefix
 		}
 
 		if route.Methods == nil || len(route.Methods) == 0 {
-			c.Routes[r].Methods = route_methods
+			c.Routes[r].Methods = routeMethods
 		}
 
 		for b, backend := range route.Backends {
 			if backend.Weight == 0 {
-				c.Routes[r].Backends[b].Weight = route_backend_weight
+				c.Routes[r].Backends[b].Weight = routeBackendWeight
 			}
 		}
 	}
 }
 
+func (c *Config) normalize() {
+	for r, route := range c.Routes {
+		curatedMethods := normalizeMethods(route.Methods)
+		c.Routes[r].Methods = curatedMethods
+	}
+}
+
 func (c *Config) validate() error {
-	if c.Server.Listen_addr == "" {
+	if c.Server.ListenAddr == "" {
 		return errors.New("Config: server.listen_addr must be set")
 	}
 
-	if c.Server.Read_timeout_ms < 0 || c.Server.Write_timeout_ms < 0 || c.Server.Idle_timeout_ms < 0 {
+	if c.Server.ReadTimeoutMs < 0 || c.Server.WriteTimeoutMs < 0 || c.Server.IdleTimeoutMs < 0 {
 		return errors.New("Config: server.*_timeouts_ms must be positive values")
 	}
 
@@ -114,7 +118,12 @@ func (c *Config) validate() error {
 			return errors.New("Config: routes.host must be set")
 		}
 
-		err := validatePathPrefix(route.Path_prefix)
+		err := validatePathPrefix(route.PathPrefix)
+		if err != nil {
+			return err
+		}
+
+		err = validateMethods(route.Methods)
 		if err != nil {
 			return err
 		}
@@ -138,15 +147,31 @@ func (c *Config) validate() error {
 	return nil
 }
 
-func validatePathPrefix(s string) error {
-	charPrefix := strings.Split(s, "")
+func normalizeMethods(methods []string) []string {
+	seen := map[string]struct{}{}
+	curatedMethods := []string{}
 
-	if charPrefix[0] != "/" {
+	for _, method := range methods {
+		m := strings.ToUpper(method)
+
+		if _, ok := seen[m]; ok {
+			continue
+		}
+
+		seen[m] = struct{}{}
+		curatedMethods = append(curatedMethods, m)
+	}
+
+	return curatedMethods
+}
+
+func validatePathPrefix(s string) error {
+	if !strings.HasPrefix(s, "/") {
 		return errors.New("Config: routes.path_prefix must start with /")
 	}
 
-	if strings.ContainsAny(s, "?:# ") {
-		return errors.New("Config: routes.path_prefix must not contain query/fragments nor whitespaces and must not be a url")
+	if strings.ContainsAny(s, "?# ") {
+		return errors.New("Config: routes.path_prefix must not contain query/fragments nor whitespaces")
 	}
 
 	return nil
@@ -155,7 +180,11 @@ func validatePathPrefix(s string) error {
 func validateUrl(s string) error {
 	url, err := url.Parse(s)
 	if err != nil {
-		return errors.New("Config: routes.backends.url must be a valid url: " + fmt.Sprintf("%v", err.Error))
+		return fmt.Errorf("Config: routes.backends.url must be a valid url: %w", err)
+	}
+
+	if url.Scheme == "" || url.Host == "" {
+		return errors.New("Config: routes.backends.url must be a valid URL")
 	}
 
 	if url.Scheme != "http" && url.Scheme != "https" {
@@ -165,7 +194,7 @@ func validateUrl(s string) error {
 	return nil
 }
 
-func validateMethods(methods []string) ([]string, error) {
+func validateMethods(methods []string) error {
 	validMethods := map[string]struct{}{
 		http.MethodGet:     struct{}{},
 		http.MethodHead:    struct{}{},
@@ -178,23 +207,11 @@ func validateMethods(methods []string) ([]string, error) {
 		http.MethodTrace:   struct{}{},
 	}
 
-	seen := map[string]struct{}{}
-	curatedMethods := []string{}
-
 	for _, method := range methods {
-		m := strings.ToUpper(method)
-
-		if _, ok := validMethods[m]; !ok {
-			return nil, errors.New("Config: routes.methods must be a valid HTTP method")
+		if _, ok := validMethods[method]; !ok {
+			return errors.New("Config: routes.methods must be a valid HTTP method")
 		}
-
-		if _, ok := seen[m]; ok {
-			continue
-		}
-
-		seen[m] = struct{}{}
-		curatedMethods = append(curatedMethods, m)
 	}
 
-	return curatedMethods, nil
+	return nil
 }
