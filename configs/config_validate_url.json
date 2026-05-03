@@ -1,0 +1,24 @@
+{
+  "server": {
+    "listen_addr": ":8080",
+    "read_timeout_ms": 0
+  },
+  "routes": [
+    {
+      "host": "api.local",
+      "methods": [],
+      "middlewares": [
+        "request_id",
+        "logging"
+      ],
+      "backends": [
+        {
+          "url": "http://127.0.0.1:9001"
+        },
+        {
+          "url": "http://127.0.0.1:9002"
+        }
+      ]
+    }
+  ]
+}

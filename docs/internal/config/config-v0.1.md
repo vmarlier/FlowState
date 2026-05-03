@@ -66,3 +66,24 @@ As of now, it is not the conservative default choice for this project.
 </details>
 
 Then we will make use of the [os](https://pkg.go.dev/os@go1.26.2) lib: to open and read the configuration from disk.
+
+## Default values
+
+To keep the v0.1 configuration concise, the loader applies the following defaults when fields are omitted or left empty:
+
+- `server.read_timeout_ms`: `5000`
+- `server.write_timeout_ms`: `10000`
+- `server.idle_timeout_ms`: `60000`
+- `route.path_prefix`: `/`
+- `route.methods`: `GET`, `POST`
+- `route.middlewares`: empty list
+- `route.backend.weight`: `1`
+
+For v0.1, omitted values and zero values are intentionally treated the same for these fields.
+
+This means:
+- a timeout set to `0` is replaced by its default value
+- a weight set to `0` is replaced by it's default value: `1`
+- an empty `path_prefix` is replaced by `/`
+- an empty or omitted `methods` list is interpreted as only `GET` and `POST`
+- an empty or omitted `middlewares` list remains empty
