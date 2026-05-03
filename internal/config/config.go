@@ -12,7 +12,6 @@ import (
 
 // TODO:
 // validate backend URL host
-// validate route has at least one backend
 // simplify/fix path prefix check implementation
 
 type Config struct {
@@ -118,6 +117,10 @@ func (c *Config) validate() error {
 		err := validatePathPrefix(route.Path_prefix)
 		if err != nil {
 			return err
+		}
+
+		if len(route.Backends) == 0 {
+			return errors.New("Config: each route must have at least one backend configured")
 		}
 
 		for _, backend := range route.Backends {
