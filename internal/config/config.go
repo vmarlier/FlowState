@@ -2,13 +2,15 @@ package config
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 )
+
+// TODO
+// SystemError handling
 
 type Config struct {
 	Server Server  `json:"server"`
@@ -105,43 +107,50 @@ func (c *Config) normalize() {
 }
 
 func (c *Config) validate() error {
+	errs := NewAggregatedConfigErrors()
+
 	if c.Server.ListenAddr == "" {
-		return errors.New("Config: server.listen_addr must be set")
+		errs.AddConfigError(*NewConfigError("server.listen_addr", "listen_addr must be set", ConfigErrorKindMissingRequired, nil))
 	}
 
 	if c.Server.ReadTimeoutMs < 0 || c.Server.WriteTimeoutMs < 0 || c.Server.IdleTimeoutMs < 0 {
-		return errors.New("Config: server.*_timeouts_ms must be positive values")
+		errs.AddConfigError(*NewConfigError("server.*_timeout_ms", "timeouts must be positive values", ConfigErrorKindOutOfRange, nil))
 	}
 
-	for _, route := range c.Routes {
+	for r, route := range c.Routes {
 		if route.Host == "" {
-			return errors.New("Config: routes.host must be set")
+			errs.AddConfigError(*NewConfigError(fmt.Sprintf("routes[%d].host", r), "host must be set", ConfigErrorKindMissingRequired, nil))
 		}
 
 		err := validatePathPrefix(route.PathPrefix)
 		if err != nil {
-			return err
+			errs.AddConfigError(*NewConfigError(fmt.Sprintf("routes[%d].path_prefix", r), err.Error(), ConfigErrorKindInvalidFormat, nil))
 		}
 
 		err = validateMethods(route.Methods)
 		if err != nil {
-			return err
+			errs.AddConfigError(*NewConfigError(fmt.Sprintf("routes[%d].methods", r), err.Error(), ConfigErrorKindInvalidValue, nil))
 		}
 
 		if len(route.Backends) == 0 {
-			return errors.New("Config: each route must have at least one backend configured")
+			errs.AddConfigError(*NewConfigError(fmt.Sprintf("routes[%d].backends", r), "each route must have at least one backend configured", ConfigErrorKindMissingRequired, nil))
 		}
 
-		for _, backend := range route.Backends {
+		for b, backend := range route.Backends {
 			if backend.Url == "" {
-				return errors.New("Config: routes.backends.url must be set")
+				errs.AddConfigError(*NewConfigError(fmt.Sprintf("routes[%d].backends[%d].url", r, b), "url must be set", ConfigErrorKindMissingRequired, nil))
+				continue
 			}
 
 			err := validateUrl(backend.Url)
 			if err != nil {
-				return err
+				errs.AddConfigError(*NewConfigError(fmt.Sprintf("routes[%d].backends[%d].url", r, b), err.Error(), ConfigErrorKindInvalidFormat, nil))
 			}
 		}
+	}
+
+	if len(errs.ConfigErrors) > 0 {
+		return errs
 	}
 
 	return nil
@@ -167,11 +176,11 @@ func normalizeMethods(methods []string) []string {
 
 func validatePathPrefix(s string) error {
 	if !strings.HasPrefix(s, "/") {
-		return errors.New("Config: routes.path_prefix must start with /")
+		return fmt.Errorf("\"%s\" path_prefix must start with /", s)
 	}
 
 	if strings.ContainsAny(s, "?# ") {
-		return errors.New("Config: routes.path_prefix must not contain query/fragments nor whitespaces")
+		return fmt.Errorf("\"%s\" path_prefix must not contain query, fragments nor whitespaces", s)
 	}
 
 	return nil
@@ -180,15 +189,15 @@ func validatePathPrefix(s string) error {
 func validateUrl(s string) error {
 	url, err := url.Parse(s)
 	if err != nil {
-		return fmt.Errorf("Config: routes.backends.url must be a valid url: %w", err)
+		return fmt.Errorf("\"%s\" can't be parsed as a URL: %w", s, err)
 	}
 
 	if url.Scheme == "" || url.Host == "" {
-		return errors.New("Config: routes.backends.url must be a valid URL")
+		return fmt.Errorf("\"%s\" must contain scheme and host to be a valid URL", url)
 	}
 
 	if url.Scheme != "http" && url.Scheme != "https" {
-		return errors.New("Config: routes.backends.url must be http or https")
+		return fmt.Errorf("\"%s\" must be http or https", url)
 	}
 
 	return nil
@@ -209,7 +218,7 @@ func validateMethods(methods []string) error {
 
 	for _, method := range methods {
 		if _, ok := validMethods[method]; !ok {
-			return errors.New("Config: routes.methods must be a valid HTTP method")
+			return fmt.Errorf("%s is not a valid HTTP method", method)
 		}
 	}
 

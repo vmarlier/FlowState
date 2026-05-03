@@ -87,3 +87,29 @@ This means:
 - an empty `path_prefix` is replaced by `/`
 - an empty or omitted `methods` list is interpreted as only `GET` and `POST`
 - an empty or omitted `middlewares` list remains empty
+
+Add this section to the ADR:
+
+## Error model
+
+Configuration validation must return **structured diagnostics**.
+
+Each validation issue should include:
+
+- **component**: source subsystem, e.g. `config`
+- **field path**: precise location, e.g. `server.listen_addr`, `routes[2].backends[1].url`
+- **kind**: stable category such as:
+  - `missing_required`
+  - `invalid_value`
+  - `invalid_format`
+  - `unsupported_value`
+  - `out_of_range`
+  - `duplicate_value`
+- **message**: human-readable explanation
+- **cause** *(optional)*: underlying wrapped error when one exists
+
+Validation should **aggregate all issues in a single pass** rather than fail fast, so users can fix multiple configuration problems at once.
+
+Errors from indexed collections must include indexes in their field paths to make debugging precise.
+
+The configuration package must remain responsible for **producing diagnostics**, not for logging. Logging and observability systems may later consume these structured diagnostics and render them as canonical logs or events.
