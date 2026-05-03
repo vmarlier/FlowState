@@ -11,7 +11,6 @@ import (
 )
 
 // TODO:
-// add method validation
 // validate backend URL host
 // validate route has at least one backend
 // simplify/fix path prefix check implementation
@@ -161,4 +160,38 @@ func validateUrl(s string) error {
 	}
 
 	return nil
+}
+
+func validateMethods(methods []string) ([]string, error) {
+	validMethods := map[string]struct{}{
+		http.MethodGet:     struct{}{},
+		http.MethodHead:    struct{}{},
+		http.MethodPost:    struct{}{},
+		http.MethodPut:     struct{}{},
+		http.MethodPatch:   struct{}{},
+		http.MethodDelete:  struct{}{},
+		http.MethodConnect: struct{}{},
+		http.MethodOptions: struct{}{},
+		http.MethodTrace:   struct{}{},
+	}
+
+	seen := map[string]struct{}{}
+	curatedMethods := []string{}
+
+	for _, method := range methods {
+		m := strings.ToUpper(method)
+
+		if _, ok := validMethods[m]; !ok {
+			return nil, errors.New("Config: routes.methods must be a valid HTTP method")
+		}
+
+		if _, ok := seen[m]; ok {
+			continue
+		}
+
+		seen[m] = struct{}{}
+		curatedMethods = append(curatedMethods, m)
+	}
+
+	return curatedMethods, nil
 }
