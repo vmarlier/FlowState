@@ -1,0 +1,41 @@
+{
+  "server": {
+    "listen_addr": "",
+    "read_timeout_ms": -1,
+    "write_timeout_ms": 10000,
+    "idle_timeout_ms": -5
+  },
+  "routes": [
+    {
+      "host": "",
+      "path_prefix": "users",
+      "methods": [
+        "GET",
+        "NOPE"
+      ],
+      "middlewares": [
+        "request_id",
+        "logging"
+      ],
+      "backends": [
+        {
+          "url": "",
+          "weight": 2
+        },
+        {
+          "url": "ftp://127.0.0.1:9002",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "host": "api.local",
+      "path_prefix": "/bad path?x=1",
+      "methods": [
+        "POST"
+      ],
+      "middlewares": [],
+      "backends": []
+    }
+  ]
+}

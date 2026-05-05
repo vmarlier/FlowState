@@ -1,5 +1,7 @@
 package config
 
+import "fmt"
+
 type AggregatedConfigErrors struct {
 	ConfigErrors []ConfigError
 }
@@ -58,5 +60,9 @@ func (a *AggregatedConfigErrors) AddConfigError(c ConfigError) {
 }
 
 func (a *AggregatedConfigErrors) Error() string {
-	return "configuration contains errors"
+	return fmt.Sprintf("configuration validation failed with %d errors", len(a.ConfigErrors))
+}
+
+func (s *SystemError) Error() string {
+	return fmt.Sprintf("component=%s message=%s cause=%w", s.Component, s.Message, s.Cause)
 }

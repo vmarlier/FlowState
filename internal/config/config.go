@@ -9,9 +9,6 @@ import (
 	"strings"
 )
 
-// TODO
-// SystemError handling
-
 type Config struct {
 	Server Server  `json:"server"`
 	Routes []Route `json:"routes"`
@@ -50,13 +47,13 @@ var routeMethods = []string{http.MethodGet, http.MethodPost}
 func Load(path string) (*Config, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, NewSystemError("failed to open config file", err)
 	}
 
 	var config Config
 	err = json.NewDecoder(file).Decode(&config)
 	if err != nil {
-		return nil, err
+		return nil, NewSystemError("failed to decode config file", err)
 	}
 
 	config.defaultValues()
