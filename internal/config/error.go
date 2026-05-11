@@ -64,5 +64,5 @@ func (a *AggregatedConfigErrors) Error() string {
 }
 
 func (s *SystemError) Error() string {
-	return fmt.Sprintf("component=%s message=%s cause=%w", s.Component, s.Message, s.Cause)
+	return fmt.Sprintf("component=%s message=%s cause=%v", s.Component, s.Message, s.Cause)
 }
