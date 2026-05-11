@@ -65,7 +65,7 @@ Measure with `testing.B`, `httptest`, and simple load tools.
 
 ### Core (v0.1)
 
-- [ ] **Static config loader**
+- [X] **Static config loader**
   - Use: `encoding/json` or `encoding/gob`/custom parser, `os`, `flag`
   - Learn: config modeling, validation, immutable runtime config
 - [ ] **HTTP server bootstrap**
